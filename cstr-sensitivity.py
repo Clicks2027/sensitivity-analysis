@@ -372,11 +372,35 @@ from SALib.sample import morris as morris_sample
 from SALib.analyze import morris as morris_analyze
 from SALib.plotting import morris as morris_plot
 
-# your code here
+trajectories = 100
+levels = 4
+
+morris_X = morris_sample.sample(problem, trajectories,
+                                num_levels=levels, seed=2026)
+print(f"Number of model runs: {len(morris_X)}")
+
+morris_Y, _ = run_model(morris_X)
+morris_Si = morris_analyze.analyze(problem, morris_X, morris_Y,
+                                    num_levels=levels, seed=2026)
+
+morris_table = morris_Si.to_df()
+print(morris_table[['mu', 'mu_star', 'sigma']].to_string())
+
+import matplotlib.pyplot as plt
+
+fig, ax = plt.subplots(figsize=(8, 6))
+morris_plot.horizontal_bar_plot(ax, morris_Si)
+plt.tight_layout()
+plt.show()
+
+fig, ax = plt.subplots(figsize=(8, 6))
+morris_plot.covariance_plot(ax, morris_Si)
+plt.tight_layout()
+plt.show()
 
 
-# %% [markdown]
-# **Answer:**
+# %% [markdown] vscode={"languageId": "raw"}
+# The highest ranking input by mu* are T_cool, T_feed, E_a, log_10A, tau, and dH. Candidates for fixing include W_stir,rho_Cp, area, dS, C_feed, and U.All inputs have sigma > mew star, suggesting their effects vary across the input ranges and they may exhibit non-linear effects.
 
 # %% [markdown]
 # ## Task 4. Sobol indices
