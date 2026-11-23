@@ -286,15 +286,30 @@ print(f'First row: X = {X_first:.3f}, T = {T_first:.1f} K')
 
 # %%
 def run_model(sample):
-    """Return one conversion and reactor temperature per row."""
-    # Loop over the rows, call the model, and collect its two outputs.
-    # Return the two collections as NumPy arrays.
+    X_values = []
+    T_values = []
 
+    for row in sample: 
+        X, T = cstr_steady_state(*row)
+        X_values.append(X)
+        T_values.append(T)
+    return np.array(X_values), np.array(T_values)
 
-# Test the first five rows and time the first 1000 here.
+X_test, T_test = run_model(test_sample[:5])
+print("Number of results:", len(X_test), len(T_test))
+
+print(f"First pair: X = {X_test[0]:.3f}, T = {T_test[0]:.1f} K")
+
+start = time.perf_counter()
+X_1000, T_1000 = run_model(test_sample[:1000])
+elapsed = time.perf_counter() - start
+
+print(f"Time for 1000 samples: {elapsed:.2f} seconds")
+print(f"Time for 10000 runs: {elapsed * 10:.2f} seconds")
+print(f"Time for 100000 run: {elapsed * 100:.2f} secon")
 
 # %% [markdown]
-# **Answer:**
+# I got the time for 10000 and 100000 runs by scaling up the time for 1000 runs
 
 # %% [markdown]
 # **(b) Local sensitivity.** At the base case, compute the normalised local sensitivity
@@ -314,9 +329,28 @@ def run_model(sample):
 # this measure? What does it say about `T_cool`?
 
 # %%
+delta = 0.01
+sensitivity_results = []
+
+for name, value in base.items():
+    higher = base.copy()
+    lower = base.copy()
+    higher[name] = value * (1 + delta)
+    lower[name] = value * (1 - delta)
+
+    X_higher, _ = cstr_steady_state(**higher)
+    X_lower, _ = cstr_steady_state(**lower)
+
+    sensitivity = (np.log(X_higher) - np.log(X_lower)) / (2 * delta)
+    sensitivity_results.append((name, sensitivity))
+
+sensitivity_results.sort(key=lambda x: abs(x[1]), reverse=True)
+for name, sensitivity in sensitivity_results:
+    print(f"{name}: {sensitivity:.3f}")
 
 # %% [markdown]
-# **Answer:**
+# The inputs that have the largest absolute magnitude sensitivities are E_a, dH, log10_A, dS
+# T_cool has a sensitivity of +0.258, a 1% increase in T_cool causes the conversion to increase by 0.258% near the base case
 
 # %% [markdown]
 # ## Task 3. Morris screening
