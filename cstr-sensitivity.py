@@ -5,9 +5,9 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.19.5
+#       jupytext_version: 1.19.6
 #   kernelspec:
-#     display_name: Python 3
+#     display_name: .venv (3.14.7)
 #     language: python
 #     name: python3
 # ---
@@ -211,6 +211,40 @@ print(f'Base case: X = {X0:.3f}, T = {T0:.1f} K')
 # the conversion rise and then fall?
 
 # %%
+T_cool_sweep = np.arange(320, 401)
+X_sweep = []
+T_sweep = []
+for T_cool in T_cool_sweep:
+   X, T = cstr_steady_state(**dict(base, T_cool=T_cool))
+   X_sweep.append(X)
+   T_sweep.append(T)
+
+X_sweep = np.array(X_sweep)
+T_sweep = np.array(T_sweep)
+
+allowed = T_cool_sweep <= 373.0
+best = np.argmax(X_sweep[allowed])
+print(f"Highest conversion at or below 373 K: " f"T_coo; = {T_cool_sweep[allowed][best]} K, X = {X_sweep[allowed][best]:.3f}")
+
+fig, (ax1, ax2) = plt.subplots(2, 1, sharex=True)
+
+ax1.plot(T_cool_sweep, X_sweep)
+ax1.set_ylabel("Conversion, X")
+
+ax2.plot(T_cool_sweep, T_sweep)
+ax2.set_ylabel("Temperature, T")
+ax2.set_xlabel("Cooling Temperature, T_cool")
+
+for ax in (ax1, ax2):
+    ax.axvline(373, color = 'red', linestyle = '--')
+    ax.axvspan(373,400, color = 'blue', alpha = 0.2)
+
+    ax1.text(0.72, 0.9, "model extrapolated", transform = ax1.transAxes)
+    plt.tight_layout()
+    plt.show()
+
+
+
 
 # %% [markdown]
 # **Answer:**
@@ -222,7 +256,7 @@ print(f'Base case: X = {X0:.3f}, T = {T0:.1f} K')
 # convenient way to express that uncertainty?
 
 # %% [markdown]
-# **Answer:**
+# The upper end of the T_cool range (373K) is a physical limit for this model because water boils at 373K at atmospheric pressure. The model assumes the water is liquid, however at or above this temperature the water would behave as vapor. For log10_A, multiply or divide A by 10^0.3 when log10_A moves by 0.3 from its base value depending on whether the 0.3 is being added to or subtracted from log10_A. A log scale is a convenient way to express that uncertainty because its expresses the uncertainty as a factor rather than a fixed amount. 
 
 # %% [markdown]
 # ## Task 2. Running the model on a sample, and local sensitivities
