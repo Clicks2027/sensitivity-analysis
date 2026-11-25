@@ -466,10 +466,9 @@ for i in indices:
 
 # %% [markdown]
 # 1. T_cool, T_feed, E_a, log_10A, tau have the largest S_T values. It agrees with the Morris ranking from task 3. Morris was good enough to tell me what inputs matter despite using far fewer runs. 
-# 2. 
-
-# %% [markdown]
-# **Answer:**
+# 2. T_cool has the largest gap between S_T and S_1 (0.465-0.248 = 0.217). This indicates that its interactions with other inputs contribute to its effect. 
+# 3. Local and global sensitivities disagree the most amongst dS. Local: -2.639 , Global: 0.017. Local sensitivity is measured close to the base case whereas the global sensitivity describes the effect on conversion across all inputs. 
+# 4. The largest estimated second-order index above the diagonal in Si is for dH and tau. The interval includes zero. The physical reason that could make these two inputs interact is that tau represents residence time, which in turn effects the amount of heat released in the reaction (dH).
 
 # %% [markdown]
 # ## Task 5. Can we fix the least influential inputs?
@@ -493,9 +492,49 @@ for i in indices:
 #    reduced model?
 
 # %%
+fixed_names = [
+    name for i, name in enumerate(problem["names"])
+    if sobol_Si["ST"][i] < 0.03
+]
+print("Inputs fixed:", fixed_names)
 
-# %% [markdown]
-# **Answer:**
+reduced = sobol_X.copy()
+for name in fixed_names:
+    column = problem["names"].index(name)
+    reduced[:, column] = base[name]
+
+reduced_Y, _ = run_model(reduced)
+agreement = 1 - np.sum((sobol_Y - reduced_Y) ** 2) / np.sum(
+    (sobol_Y - np.mean(sobol_Y)) ** 2
+)
+print(f"Agreement score: {agreement:.3f}")
+fixed_ST_sum = sum(
+    sobol_Si["ST"][problem["names"].index(name)]
+    for name in fixed_names
+)
+print(f"1 - sum of fixed ST: {1 - fixed_ST_sum:.3f}")
+
+differences = np.abs(sobol_Y - reduced_Y)
+worst = np.argmax(differences)
+print(f"Largest absolute difference: {differences[worst]:.3f}")
+print(f"Full conversion: {sobol_Y[worst]:.3f}")
+print(f"Reduced conversion: {reduced_Y[worst]:.3f}")
+
+import matplotlib.pyplot as plt
+
+lower = min(sobol_Y.min(), reduced_Y.min())
+upper = max(sobol_Y.max(), reduced_Y.max())
+plt.scatter(sobol_Y, reduced_Y, s=8, alpha=0.25)
+plt.plot([lower, upper], [lower, upper], "k--")
+plt.xlim(lower, upper)
+plt.ylim(lower, upper)
+plt.xlabel("Full-model conversion")
+plt.ylabel("Reduced-model conversion")
+plt.tight_layout()
+plt.show()
+
+# %% [markdown] vscode={"languageId": "raw"}
+# The agreement score: 0.917 is close to the 1-sum S_T: 0.910. The largest absiolute difference is a conversion of 0.794, the reduced model prediction of 0.827 minus the full model prediction of 0.033. I would only trust the reduced model for overall trends but not for individual predictions. 
 
 # %% [markdown]
 # ## Task 6. What should you measure better? It depends how you run the reactor
@@ -517,6 +556,47 @@ for i in indices:
 # Keep the conversion for Sobol analysis.
 
 # %%
+from SALib.sample import sobol as sobol_sample
+from SALib.analyze import sobol as sobol_analyze
+import numpy as np
+import pandas as pd
+
+uncertain_names = ["log10_A", "Ea", "dH", "dS", "U", "rho_cp"]
+
+bounds_by_name = dict(zip(problem["names"], problem["bounds"]))
+problem6 = {
+    "num_vars": len(uncertain_names),
+    "names": uncertain_names,
+    "bounds": [bounds_by_name[name] for name in uncertain_names],
+}
+
+sobol_X6 = sobol_sample.sample(
+    problem6, 1024, calc_second_order=False, seed=2026
+)
+print("Rows in shared sample:", len(sobol_X6))
+
+coolant_temperatures = [325, 350, 373]
+ST_by_temperature = {}
+
+for coolant in coolant_temperatures:
+    conversions = []
+
+    for row in sobol_X6:
+        inputs = base.copy()
+        inputs["T_cool"] = coolant
+        inputs.update(zip(uncertain_names, row))
+        conversion, reactor_temperature = cstr_steady_state(**inputs)
+        conversions.append(conversion)
+
+    Si6 = sobol_analyze.analyze(
+        problem6,
+        np.array(conversions),
+        calc_second_order=False,
+        seed=2026,
+    )
+    ST_by_temperature[f"{coolant} K"] = Si6["ST"]
+ST_table = pd.DataFrame(ST_by_temperature, index=uncertain_names)
+print(ST_table.to_string(float_format=lambda value: f"{value:.3f}"))
 
 # %% [markdown]
 # **(b)** Which property would you prioritize for measurement with cold coolant? With coolant
@@ -524,7 +604,7 @@ for i in indices:
 # give the lowest measurement priority across these three settings?
 
 # %% [markdown]
-# **Answer:**
+# I would prioritize E_a for measurement with cold coolant. For coolant near boiling I would prioritize dH for measurement. The activation energy directly influences the reaction rate which has the most influence on conversion at cold temperatures. Alternatively, the enthalpy dH is most influential on conversion at high temperatures. I would give rho_cp the lowest measurement priority across the three settings. 
 
 # %% [markdown]
 # **(c)** Would you run the reactor at the coolant temperature that gave the highest conversion
@@ -533,7 +613,7 @@ for i in indices:
 # the coolant temperature 10 K from that optimum.
 
 # %% [markdown]
-# **Answer:**
+# I would not run the reactor at the coolant temperature (367K) that give the highest conversion in task 1 since it is so close to the boiling point 373K, a physical effect the model leaves out since it assumes water is in liquid phase. Furthermore, since hte model assumes steady state behavior, disturbances may change the reactor operation and the model wont be able to account for that. Lowering the coolant temperature 10K from the optimum to 357K changes the conversion from 0.7318 to 0.7188, a loss of 1.3 percentage points.
 
 # %% [markdown]
 # ---
