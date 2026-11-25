@@ -417,10 +417,40 @@ plt.show()
 # 95% interval as $S_T$ ± `ST_conf`. SALib returns the half-width in `ST_conf`.
 
 # %%
+
+from SALib.sample import sobol as sobol_sample
+
+
 from SALib.analyze import sobol as sobol_analyze
 
-# your code here
+sobol_X = sobol_sample.sample(
+    problem,
+    1024,
+    calc_second_order=True,
+    seed=2026
+)
 
+print("Number of rows:", len(sobol_X))
+
+sobol_Y, sobol_T = run_model(sobol_X)
+sobol_Si = sobol_analyze.analyze(
+    problem,
+    sobol_Y,
+    calc_second_order=True,
+    seed=2026
+)
+indices = sorted(
+    range(problem["num_vars"]),
+    key=lambda i: sobol_Si["ST"][i],
+    reverse=True
+)
+print("Input        S1       ST       95% interval")
+for i in indices:
+    name = problem["names"][i]
+    S1 = sobol_Si["S1"][i]
+    ST = sobol_Si["ST"][i]
+    ST_conf = sobol_Si["ST_conf"][i]
+    print(f"{name:10s} {S1:8.3f} {ST:8.3f}  ST ± {ST_conf:.3f}")
 
 # %% [markdown]
 # **(b)** Answer in words:
@@ -434,7 +464,9 @@ from SALib.analyze import sobol as sobol_analyze
 #    corresponding entry in `Si['S2_conf']` as the ± half-width. Does the interval include zero?
 #    What physical reason could make those two inputs interact?
 
-# %%
+# %% [markdown]
+# 1. T_cool, T_feed, E_a, log_10A, tau have the largest S_T values. It agrees with the Morris ranking from task 3. Morris was good enough to tell me what inputs matter despite using far fewer runs. 
+# 2. 
 
 # %% [markdown]
 # **Answer:**
